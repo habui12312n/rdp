@@ -37,18 +37,17 @@ jobs:
       run: |
         try {
           Write-Output "Khởi động playit.gg agent với xác thực..."
-          Start-Process -FilePath ".\playit\playit.exe" -ArgumentList "--secret ${{ secrets.PLAYIT_SECRET_KEY }} run" -NoNewWindow -PassThru -RedirectStandardOutput "tunnel_output.txt" -RedirectStandardError "tunnel_error.txt" -Wait -Timeout 30 | Out-Null
+          Start-Job -ScriptBlock {
+            Start-Process -FilePath ".\playit\playit.exe" -ArgumentList "--secret ${{ secrets.PLAYIT_SECRET_KEY }} run" -NoNewWindow -RedirectStandardOutput "tunnel_output.txt" -RedirectStandardError "tunnel_error.txt"
+          } | Out-Null
+          Start-Sleep -Seconds 10
           Write-Output "Đầu ra tunnel:"
-          Get-Content tunnel_output.txt
+          Get-Content tunnel_output.txt -ErrorAction SilentlyContinue
           Write-Output "Lỗi tunnel (nếu có):"
-          Get-Content tunnel_error.txt
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Khởi động tunnel thất bại. Kiểm tra tunnel_error.txt để biết chi tiết."
-            exit 1
-          }
+          Get-Content tunnel_error.txt -ErrorAction SilentlyContinue
         } catch {
           Write-Error "Tạo tunnel thất bại: $_"
-          Get-Content tunnel_error.txt
+          Get-Content tunnel_error.txt -ErrorAction SilentlyContinue
           exit 1
         }
       shell: powershell
