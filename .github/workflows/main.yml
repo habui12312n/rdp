@@ -7,79 +7,39 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Tải playit.gg Agent
+    - name: Download playit.gg Agent
       run: |
         try {
-          Write-Output "Tải playit.gg agent..."
           Invoke-WebRequest -Uri "https://github.com/playit-cloud/playit-agent/releases/download/v0.15.0/playit-windows-x86_64.exe" -OutFile "playit.exe" -ErrorAction Stop
         } catch {
-          Write-Error "Tải playit.gg agent thất bại: $_"
+          Write-Error "Failed to download playit.gg agent. Please verify the URL at https://github.com/playit-cloud/playit-agent/releases or https://playit.gg/download."
           exit 1
         }
       shell: powershell
 
-    - name: Di chuyển file thực thi playit
+    - name: Move playit executable
       run: |
-        Write-Output "Tạo thư mục playit và di chuyển file..."
         New-Item -ItemType Directory -Path ".\playit" -Force
         Move-Item -Path "playit.exe" -Destination ".\playit\playit.exe" -Force
       shell: powershell
       continue-on-error: true
 
-    - name: Kiểm tra Secret Key
-      run: |
-        if (-not "${{ secrets.PLAYIT_SECRET_KEY }}") {
-          Write-Error "PLAYIT_SECRET_KEY không được thiết lập trong GitHub Secrets. Vui lòng thêm key từ https://playit.gg/account."
-          exit 1
-        } else {
-          Write-Output "PLAYIT_SECRET_KEY đã được thiết lập."
-        }
-      shell: powershell
+    - name: Authenticate playit.gg
+      run: .\playit\playit.exe --secret ${{ secrets.PLAYIT_SECRET_KEY }}
       env:
         PLAYIT_SECRET_KEY: ${{ secrets.PLAYIT_SECRET_KEY }}
 
-    - name: Xác thực và khởi động Tunnel
-      run: |
-        try {
-          Write-Output "Thư mục làm việc hiện tại:"
-          Get-Location
-          Write-Output "Khởi động playit.gg agent với xác thực..."
-          $env:RUST_BACKTRACE = "1"
-          .\playit\playit.exe --secret "${{ secrets.PLAYIT_SECRET_KEY }}" run > tunnel_output.txt 2> tunnel_error.txt
-          Start-Sleep -Seconds 120
-          Write-Output "Đầu ra tunnel:"
-          Get-Content tunnel_output.txt -ErrorAction SilentlyContinue
-          Write-Output "Lỗi tunnel (nếu có):"
-          Get-Content tunnel_error.txt -ErrorAction SilentlyContinue
-          if (Test-Path "tunnel_output.txt") {
-            $output = Get-Content tunnel_output.txt -Raw -ErrorAction SilentlyContinue
-            if ($output -match "tunnel running") {
-              Write-Output "Tunnel khởi động thành công."
-            } else {
-              Write-Error "Tunnel không khởi động đúng. Kiểm tra tunnel_error.txt."
-              exit 1
-            }
-          } else {
-            Write-Error "Không tìm thấy tunnel_output.txt. Tunnel có thể không khởi động."
-            exit 1
-          }
-        } catch {
-          Write-Error "Tạo tunnel thất bại: $_"
-          Get-Content tunnel_error.txt -ErrorAction SilentlyContinue
-          exit 1
-        }
-      shell: powershell
-      env:
-        PLAYIT_SECRET_KEY: ${{ secrets.PLAYIT_SECRET_KEY }}
-
-    - name: Bật Terminal Services
+    - name: Enable TS
       run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
 
-    - name: Bật quy tắc tường lửa Remote Desktop
+    - name: Enable Remote Desktop Firewall Rule
       run: Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
 
-    - name: Cấu hình bảo mật RDP
+    - name: Configure RDP Security
       run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
 
-    - name: Đặt mật khẩu người dùng cục bộ
+    - name: Set Local User Password
       run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
+
+    - name: Create Tunnel with playit.gg
+      run: Start-Process -FilePath ".\playit\playit.exe" -ArgumentList "run" -NoNewWindow
