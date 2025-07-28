@@ -7,18 +7,26 @@ jobs:
     runs-on: windows-latest
 
     steps:
+    - name: Kiểm tra phiên bản PowerShell
+      run: |
+        Write-Output "Kiểm tra phiên bản PowerShell..."
+        $PSVersionTable.PSVersion
+      shell: powershell
+
     - name: Tải playit.gg Agent
       run: |
         try {
+          Write-Output "Tải playit.gg agent..."
           Invoke-WebRequest -Uri "https://github.com/playit-cloud/playit-agent/releases/download/v0.15.0/playit-windows-x86_64.exe" -OutFile "playit.exe" -ErrorAction Stop
         } catch {
-          Write-Error "Tải playit.gg agent thất bại. Vui lòng kiểm tra URL tại https://github.com/playit-cloud/playit-agent/releases hoặc https://playit.gg/download."
+          Write-Error "Tải playit.gg agent thất bại: $_"
           exit 1
         }
       shell: powershell
 
     - name: Di chuyển file thực thi playit
       run: |
+        Write-Output "Tạo thư mục playit và di chuyển file..."
         New-Item -ItemType Directory -Path ".\playit" -Force
         Move-Item -Path "playit.exe" -Destination ".\playit\playit.exe" -Force
       shell: powershell
@@ -35,6 +43,13 @@ jobs:
         }
       shell: powershell
 
+    - name: Kiểm tra quyền file playit.exe
+      run: |
+        Write-Output "Kiểm tra quyền file playit.exe..."
+        Get-Acl ".\playit\playit.exe" | Format-List
+      shell: powershell
+      continue-on-error: true
+
     - name: Kiểm tra phiên bản playit.gg
       run: |
         try {
@@ -42,7 +57,7 @@ jobs:
           .\playit\playit.exe --version 2> version_error.txt
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Lệnh --version thất bại. Kiểm tra version_error.txt."
-            Get-Content version_error.txt
+            Get-Content version_error.txt -ErrorAction SilentlyContinue
             exit 1
           }
         } catch {
@@ -59,7 +74,7 @@ jobs:
           .\playit\playit.exe --help 2> help_error.txt
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Lệnh --help thất bại. Kiểm tra help_error.txt."
-            Get-Content help_error.txt
+            Get-Content help_error.txt -ErrorAction SilentlyContinue
             exit 1
           }
         } catch {
@@ -99,7 +114,7 @@ jobs:
           Get-Location
           Write-Output "Khởi động playit.gg agent với xác thực..."
           .\playit\playit.exe --secret "${{ secrets.PLAYIT_SECRET_KEY }}" run > tunnel_output.txt 2> tunnel_error.txt
-          Start-Sleep -Seconds 60
+          Start-Sleep -Seconds 90
           Write-Output "Đầu ra tunnel:"
           Get-Content tunnel_output.txt -ErrorAction SilentlyContinue
           Write-Output "Lỗi tunnel (nếu có):"
