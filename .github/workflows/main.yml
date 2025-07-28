@@ -7,12 +7,6 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Kiểm tra phiên bản PowerShell
-      run: |
-        Write-Output "Kiểm tra phiên bản PowerShell..."
-        $PSVersionTable.PSVersion
-      shell: powershell
-
     - name: Tải playit.gg Agent
       run: |
         try {
@@ -32,58 +26,6 @@ jobs:
       shell: powershell
       continue-on-error: true
 
-    - name: Kiểm tra file playit.exe
-      run: |
-        Write-Output "Kiểm tra file playit.exe..."
-        if (Test-Path ".\playit\playit.exe") {
-          Write-Output "File playit.exe tồn tại."
-        } else {
-          Write-Error "File playit.exe không tồn tại trong thư mục playit."
-          exit 1
-        }
-      shell: powershell
-
-    - name: Kiểm tra quyền file playit.exe
-      run: |
-        Write-Output "Kiểm tra quyền file playit.exe..."
-        Get-Acl ".\playit\playit.exe" | Format-List
-      shell: powershell
-      continue-on-error: true
-
-    - name: Kiểm tra phiên bản playit.gg
-      run: |
-        try {
-          Write-Output "Kiểm tra phiên bản playit.gg agent..."
-          .\playit\playit.exe --version 2> version_error.txt
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Lệnh --version thất bại. Kiểm tra version_error.txt."
-            Get-Content version_error.txt -ErrorAction SilentlyContinue
-            exit 1
-          }
-        } catch {
-          Write-Error "Lệnh --version gặp lỗi: $_"
-          Get-Content version_error.txt -ErrorAction SilentlyContinue
-          exit 1
-        }
-      shell: powershell
-
-    - name: Kiểm tra lệnh playit.gg
-      run: |
-        try {
-          Write-Output "Các lệnh khả dụng:"
-          .\playit\playit.exe --help 2> help_error.txt
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Lệnh --help thất bại. Kiểm tra help_error.txt."
-            Get-Content help_error.txt -ErrorAction SilentlyContinue
-            exit 1
-          }
-        } catch {
-          Write-Error "Lệnh --help gặp lỗi: $_"
-          Get-Content help_error.txt -ErrorAction SilentlyContinue
-          exit 1
-        }
-      shell: powershell
-
     - name: Kiểm tra Secret Key
       run: |
         if (-not "${{ secrets.PLAYIT_SECRET_KEY }}") {
@@ -95,17 +37,6 @@ jobs:
       shell: powershell
       env:
         PLAYIT_SECRET_KEY: ${{ secrets.PLAYIT_SECRET_KEY }}
-
-    - name: Kiểm tra trạng thái dịch vụ playit.gg
-      run: |
-        try {
-          Write-Output "Kiểm tra trạng thái dịch vụ playit.gg..."
-          $status = Invoke-WebRequest -Uri "https://status.playit.gg" -ErrorAction Stop
-          Write-Output "Trạng thái dịch vụ: $($status.StatusDescription)"
-        } catch {
-          Write-Warning "Không thể kiểm tra trạng thái dịch vụ playit.gg: $_"
-        }
-      shell: powershell
 
     - name: Xác thực và khởi động Tunnel
       run: |
