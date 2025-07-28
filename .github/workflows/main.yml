@@ -44,7 +44,9 @@ jobs:
           Write-Output "Thư mục làm việc hiện tại:"
           Get-Location
           Write-Output "Khởi động playit.gg agent với xác thực..."
-          Start-Process -FilePath ".\playit\playit.exe" -ArgumentList "--secret ${{ secrets.PLAYIT_SECRET_KEY }} run" -NoNewWindow -RedirectStandardOutput "tunnel_output.txt" -RedirectStandardError "tunnel_error.txt" -PassThru | Wait-Process -Timeout 90
+          $env:RUST_BACKTRACE = "1"
+          .\playit\playit.exe --secret "${{ secrets.PLAYIT_SECRET_KEY }}" run > tunnel_output.txt 2> tunnel_error.txt
+          Start-Sleep -Seconds 120
           Write-Output "Đầu ra tunnel:"
           Get-Content tunnel_output.txt -ErrorAction SilentlyContinue
           Write-Output "Lỗi tunnel (nếu có):"
