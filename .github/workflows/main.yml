@@ -39,9 +39,15 @@ jobs:
       run: |
         try {
           Write-Output "Kiểm tra phiên bản playit.gg agent..."
-          .\playit\playit.exe --version
+          .\playit\playit.exe --version 2> version_error.txt
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Lệnh --version thất bại. Kiểm tra version_error.txt."
+            Get-Content version_error.txt
+            exit 1
+          }
         } catch {
-          Write-Error "Lệnh --version thất bại: $_"
+          Write-Error "Lệnh --version gặp lỗi: $_"
+          Get-Content version_error.txt -ErrorAction SilentlyContinue
           exit 1
         }
       shell: powershell
@@ -50,9 +56,15 @@ jobs:
       run: |
         try {
           Write-Output "Các lệnh khả dụng:"
-          .\playit\playit.exe --help
+          .\playit\playit.exe --help 2> help_error.txt
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Lệnh --help thất bại. Kiểm tra help_error.txt."
+            Get-Content help_error.txt
+            exit 1
+          }
         } catch {
-          Write-Error "Lệnh --help thất bại: $_"
+          Write-Error "Lệnh --help gặp lỗi: $_"
+          Get-Content help_error.txt -ErrorAction SilentlyContinue
           exit 1
         }
       shell: powershell
@@ -87,7 +99,7 @@ jobs:
           Get-Location
           Write-Output "Khởi động playit.gg agent với xác thực..."
           .\playit\playit.exe --secret "${{ secrets.PLAYIT_SECRET_KEY }}" run > tunnel_output.txt 2> tunnel_error.txt
-          Start-Sleep -Seconds 40
+          Start-Sleep -Seconds 60
           Write-Output "Đầu ra tunnel:"
           Get-Content tunnel_output.txt -ErrorAction SilentlyContinue
           Write-Output "Lỗi tunnel (nếu có):"
