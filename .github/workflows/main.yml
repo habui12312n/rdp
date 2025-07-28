@@ -1,7 +1,6 @@
-name: Windows RDP via playit.gg
+name: Windows RDP via playit.gg (24H)
 
 on:
-  push:
   workflow_dispatch:
 
 jobs:
@@ -12,12 +11,7 @@ jobs:
     - name: Download playit.gg Agent
       shell: powershell
       run: |
-        try {
-          Invoke-WebRequest -Uri "https://github.com/playit-cloud/playit-agent/releases/download/v0.15.0/playit-windows-x86_64.exe" -OutFile "playit.exe" -ErrorAction Stop
-        } catch {
-          Write-Error "Failed to download playit.gg agent. Please verify the URL."
-          exit 1
-        }
+        Invoke-WebRequest -Uri "https://github.com/playit-cloud/playit-agent/releases/download/v0.15.0/playit-windows-x86_64.exe" -OutFile "playit.exe"
 
     - name: Move playit executable
       shell: powershell
@@ -25,7 +19,7 @@ jobs:
         New-Item -ItemType Directory -Path ".\playit" -Force
         Move-Item -Path "playit.exe" -Destination ".\playit\playit.exe" -Force
 
-    - name: Authenticate playit.gg
+    - name: Authenticate playit.gg (register secret)
       shell: powershell
       env:
         PLAYIT_SECRET_KEY: ${{ secrets.PLAYIT_SECRET_KEY }}
@@ -45,19 +39,14 @@ jobs:
         $password = ConvertTo-SecureString "P@ssw0rd!" -AsPlainText -Force
         Set-LocalUser -Name "runneradmin" -Password $password
 
-    - name: Create Tunnel with playit.gg
+    - name: Start Playit Tunnel in Background (non-blocking)
       shell: powershell
       run: |
-        .\playit\playit.exe run &
-        Start-Sleep -Seconds 10
+        Start-Process -FilePath ".\playit\playit.exe" -ArgumentList "run" -WindowStyle Hidden
+        Write-Host "✅ playit tunnel started in background"
 
-    - name: Show public tunnel status (for debug)
+    - name: Keep runner alive for 24 hours (86400s)
       shell: powershell
       run: |
-        Write-Host "Tunnel should now be active. Please check your playit.gg dashboard."
-
-    - name: Keep runner alive for 30 minutes
-      shell: powershell
-      run: |
-        Write-Host "🟢 RDP tunnel is active. Keeping machine alive for 30 minutes..."
-        Start-Sleep -Seconds 1800
+        Write-Host "🟢 Tunnel is active. Keeping session alive for 24 hours..."
+        Start-Sleep -Seconds 86400
