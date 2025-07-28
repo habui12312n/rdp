@@ -8,74 +8,56 @@ jobs:
 
     steps:
     - name: Tải playit.gg Agent
-      run: |
-        try {
-          Invoke-WebRequest -Uri "https://github.com/playit-cloud/playit-agent/releases/download/v0.15.0/playit-windows-x86_64.exe" -OutFile "playit.exe" -ErrorAction Stop
-        } catch {
-          Write-Error "Tải playit.gg agent thất bại. Vui lòng kiểm tra URL tại https://github.com/playit-cloud/playit-agent/releases hoặc https://playit.gg/download."
-          exit 1
-        }
       shell: powershell
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/playit-cloud/playit-agent/releases/download/v0.15.0/playit-windows-x86_64.exe" -OutFile "playit.exe"
 
     - name: Di chuyển file thực thi playit
+      shell: powershell
       run: |
         New-Item -ItemType Directory -Path ".\playit" -Force
         Move-Item -Path "playit.exe" -Destination ".\playit\playit.exe" -Force
-      shell: powershell
-      continue-on-error: true
 
     - name: Kiểm tra playit.gg Agent
+      shell: powershell
       run: |
         Write-Output "Kiểm tra phiên bản playit.gg agent..."
         .\playit\playit.exe --version
-        Write-Output "Các lệnh khả dụng:"
         .\playit\playit.exe --help
-      shell: powershell
-      continue-on-error: true
 
-    - name: Xác thực và khởi động Tunnel
-      run: |
-        try {
-          Write-Output "Khởi động playit.gg agent với xác thực..."
-          Start-Job -ScriptBlock {
-            Start-Process -FilePath ".\playit\playit.exe" -ArgumentList "--secret ${{ secrets.PLAYIT_SECRET_KEY }} run" -NoNewWindow -RedirectStandardOutput "tunnel_output.txt" -RedirectStandardError "tunnel_error.txt"
-          } | Out-Null
-          Start-Sleep -Seconds 10
-          Write-Output "Đầu ra tunnel:"
-          Get-Content tunnel_output.txt -ErrorAction SilentlyContinue
-          Write-Output "Lỗi tunnel (nếu có):"
-          Get-Content tunnel_error.txt -ErrorAction SilentlyContinue
-        } catch {
-          Write-Error "Tạo tunnel thất bại: $_"
-          Get-Content tunnel_error.txt -ErrorAction SilentlyContinue
-          exit 1
-        }
+    - name: Xác thực Agent bằng Secret Key
       shell: powershell
       env:
         PLAYIT_SECRET_KEY: ${{ secrets.PLAYIT_SECRET_KEY }}
+      run: |
+        .\playit\playit.exe --secret $env:PLAYIT_SECRET_KEY
+
+    - name: Khởi động Tunnel (nền, không block)
+      shell: powershell
+      run: |
+        Start-Process -FilePath ".\playit\playit.exe" -ArgumentList "run" -WindowStyle Hidden
+        Write-Output "✅ Tunnel đang chạy nền"
 
     - name: Bật Terminal Services
-      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
+      shell: powershell
+      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
 
     - name: Bật quy tắc tường lửa Remote Desktop
+      shell: powershell
       run: Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
 
     - name: Cấu hình bảo mật RDP
-      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+      shell: powershell
+      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
 
     - name: Đặt mật khẩu người dùng cục bộ
-      run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
-
-    - name: Kiểm tra trạng thái Tunnel
-      run: |
-        try {
-          Write-Output "Kiểm tra trạng thái tunnel qua API playit.gg..."
-          $tunnelStatus = Invoke-WebRequest -Uri "https://api.playit.gg/agents/status" -Headers @{"Authorization"="Agent-Key ${{ secrets.PLAYIT_SECRET_KEY }}"} -ErrorAction Stop
-          Write-Output "Trạng thái tunnel: $($tunnelStatus.Content)"
-        } catch {
-          Write-Error "Kiểm tra trạng thái tunnel thất bại: $_"
-          exit 1
-        }
       shell: powershell
-      env:
-        PLAYIT_SECRET_KEY: ${{ secrets.PLAYIT_SECRET_KEY }}
+      run: |
+        $password = ConvertTo-SecureString "P@ssw0rd!" -AsPlainText -Force
+        Set-LocalUser -Name "runneradmin" -Password $password
+
+    - name: Giữ phiên làm việc trong 24 giờ
+      shell: powershell
+      run: |
+        Write-Output "🕒 Đang giữ phiên làm việc trong 24 giờ (86400 giây)..."
+        Start-Sleep -Seconds 86400
