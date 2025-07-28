@@ -1,45 +1,63 @@
-name: CI
+name: Windows RDP via playit.gg
 
-on: [push, workflow_dispatch]
+on:
+  push:
+  workflow_dispatch:
 
 jobs:
-  build:
+  rdp-tunnel:
     runs-on: windows-latest
 
     steps:
     - name: Download playit.gg Agent
+      shell: powershell
       run: |
         try {
           Invoke-WebRequest -Uri "https://github.com/playit-cloud/playit-agent/releases/download/v0.15.0/playit-windows-x86_64.exe" -OutFile "playit.exe" -ErrorAction Stop
         } catch {
-          Write-Error "Failed to download playit.gg agent. Please verify the URL at https://github.com/playit-cloud/playit-agent/releases or https://playit.gg/download."
+          Write-Error "Failed to download playit.gg agent. Please verify the URL."
           exit 1
         }
-      shell: powershell
 
     - name: Move playit executable
+      shell: powershell
       run: |
         New-Item -ItemType Directory -Path ".\playit" -Force
         Move-Item -Path "playit.exe" -Destination ".\playit\playit.exe" -Force
-      shell: powershell
-      continue-on-error: true
 
     - name: Authenticate playit.gg
-      run: .\playit\playit.exe --secret ${{ secrets.PLAYIT_SECRET_KEY }}
+      shell: powershell
       env:
         PLAYIT_SECRET_KEY: ${{ secrets.PLAYIT_SECRET_KEY }}
+      run: |
+        .\playit\playit.exe --secret $env:PLAYIT_SECRET_KEY
 
-    - name: Enable TS
-      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
-
-    - name: Enable Remote Desktop Firewall Rule
-      run: Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-
-    - name: Configure RDP Security
-      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+    - name: Enable Remote Desktop
+      shell: powershell
+      run: |
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
 
     - name: Set Local User Password
-      run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
+      shell: powershell
+      run: |
+        $password = ConvertTo-SecureString "P@ssw0rd!" -AsPlainText -Force
+        Set-LocalUser -Name "runneradmin" -Password $password
 
     - name: Create Tunnel with playit.gg
-      run: Start-Process -FilePath ".\playit\playit.exe" -ArgumentList "run" -NoNewWindow
+      shell: powershell
+      run: |
+        .\playit\playit.exe run &
+        Start-Sleep -Seconds 10
+
+    - name: Show public tunnel status (for debug)
+      shell: powershell
+      run: |
+        Write-Host "Tunnel should now be active. Please check your playit.gg dashboard."
+
+    - name: Keep runner alive for 30 minutes
+      shell: powershell
+      run: |
+        Write-Host "🟢 RDP tunnel is active. Keeping machine alive for 30 minutes..."
+        Start-Sleep -Seconds 1800
