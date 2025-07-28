@@ -1,10 +1,9 @@
-name: Windows RDP via playit.gg (24H)
+name: CI
 
-on:
-  workflow_dispatch:
+on: [push, workflow_dispatch]
 
 jobs:
-  rdp-tunnel:
+  build:
     runs-on: windows-latest
 
     steps:
@@ -19,12 +18,24 @@ jobs:
         New-Item -ItemType Directory -Path ".\playit" -Force
         Move-Item -Path "playit.exe" -Destination ".\playit\playit.exe" -Force
 
-    - name: Authenticate playit.gg (register secret)
+    - name: Verify playit.gg Agent
+      shell: powershell
+      run: |
+        .\playit\playit.exe --version
+        .\playit\playit.exe --help
+
+    - name: Authenticate Agent (once)
       shell: powershell
       env:
         PLAYIT_SECRET_KEY: ${{ secrets.PLAYIT_SECRET_KEY }}
       run: |
         .\playit\playit.exe --secret $env:PLAYIT_SECRET_KEY
+
+    - name: Start playit tunnel (background)
+      shell: powershell
+      run: |
+        Start-Process -FilePath ".\playit\playit.exe" -ArgumentList "run" -WindowStyle Hidden
+        Write-Host "✅ Tunnel started."
 
     - name: Enable Remote Desktop
       shell: powershell
@@ -39,13 +50,7 @@ jobs:
         $password = ConvertTo-SecureString "P@ssw0rd!" -AsPlainText -Force
         Set-LocalUser -Name "runneradmin" -Password $password
 
-    - name: Start Playit Tunnel in Background (non-blocking)
-      shell: powershell
-      run: |
-        Start-Process -FilePath ".\playit\playit.exe" -ArgumentList "run" -WindowStyle Hidden
-        Write-Host "✅ playit tunnel started in background"
-
-    - name: Keep runner alive for 24 hours (86400s)
+    - name: Wait 24 hours (keep session alive)
       shell: powershell
       run: |
         Write-Host "🟢 Tunnel is active. Keeping session alive for 24 hours..."
